@@ -150,9 +150,17 @@ public class AsynchronousClient
     {
         // Convert the string data to byte data using ASCII encoding.  
         byte[] byteData = Encoding.ASCII.GetBytes(data);
-
         // Begin sending the data to the remote device.  
-        client.BeginSend(byteData, 0, byteData.Length, 0,
+
+        byte[] intBytes = BitConverter.GetBytes(byteData.Length);
+        byte[] result = intBytes;
+        byte[] output = new byte[result.Length + byteData.Length];
+        for (int i = 0; i < result.Length; i++)
+            output[i] = result[i];
+        for (int j = 0; j < byteData.Length; j++)
+            output[result.Length + j] = byteData[j];
+
+        client.BeginSend(output, 0, output.Length, 0,
             new AsyncCallback(SendCallback), client);
     }
 
